@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -11,9 +12,10 @@ if os.getenv('SYSTEM') == 'spaces':
     mim.uninstall('mmcv-full', confirm_yes=True)
     mim.install('mmcv-full==1.5.0', is_yes=True)
 
-    subprocess.call('pip uninstall -y opencv-python'.split())
-    subprocess.call('pip uninstall -y opencv-python-headless'.split())
-    subprocess.call('pip install opencv-python-headless==4.5.5.64'.split())
+    subprocess.call(shlex.split('pip uninstall -y opencv-python'))
+    subprocess.call(shlex.split('pip uninstall -y opencv-python-headless'))
+    subprocess.call(
+        shlex.split('pip install opencv-python-headless==4.5.5.64'))
 
 import cv2
 import huggingface_hub
@@ -27,7 +29,7 @@ from mmdet.apis import inference_detector, init_detector
 from mmpose.apis import (inference_top_down_pose_model, init_pose_model,
                          process_mmdet_results, vis_pose_result)
 
-HF_TOKEN = os.environ['HF_TOKEN']
+HF_TOKEN = os.getenv('HF_TOKEN')
 
 
 class DetModel:
@@ -58,8 +60,9 @@ class DetModel:
         },
     }
 
-    def __init__(self, device: str | torch.device):
-        self.device = torch.device(device)
+    def __init__(self):
+        self.device = torch.device(
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
         self._load_all_models_once()
         self.model_name = 'YOLOX-l'
         self.model = self._load_model(self.model_name)
@@ -131,8 +134,9 @@ class PoseModel:
         },
     }
 
-    def __init__(self, device: str | torch.device):
-        self.device = torch.device(device)
+    def __init__(self):
+        self.device = torch.device(
+            'cuda:0' if torch.cuda.is_available() else 'cpu')
         self.model_name = 'ViTPose-B (multi-task train, COCO)'
         self.model = self._load_model(self.model_name)
 
@@ -199,9 +203,9 @@ class PoseModel:
 
 
 class AppModel:
-    def __init__(self, device: str | torch.device):
-        self.det_model = DetModel(device)
-        self.pose_model = PoseModel(device)
+    def __init__(self):
+        self.det_model = DetModel()
+        self.pose_model = PoseModel()
 
     def run(
         self, video_path: str, det_model_name: str, pose_model_name: str,
@@ -222,8 +226,8 @@ class AppModel:
         preds_all = []
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        temp_file = tempfile.NamedTemporaryFile(suffix='.mp4')
-        writer = cv2.VideoWriter(temp_file.name, fourcc, fps, (width, height))
+        out_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+        writer = cv2.VideoWriter(out_file.name, fourcc, fps, (width, height))
         for _ in range(max_num_frames):
             ok, frame = cap.read()
             if not ok:
@@ -238,10 +242,6 @@ class AppModel:
         cap.release()
         writer.release()
 
-        out_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
-        subprocess.run(
-            f'ffmpeg -y -loglevel quiet -stats -i {temp_file.name} -c:v libx264 {out_file.name}'
-            .split())
         return out_file.name, preds_all
 
     def visualize_pose_results(self, video_path: str,
@@ -257,8 +257,8 @@ class AppModel:
         fps = cap.get(cv2.CAP_PROP_FPS)
 
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        temp_file = tempfile.NamedTemporaryFile(suffix='.mp4')
-        writer = cv2.VideoWriter(temp_file.name, fourcc, fps, (width, height))
+        out_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
+        writer = cv2.VideoWriter(out_file.name, fourcc, fps, (width, height))
         for pose_preds in pose_preds_all:
             ok, frame = cap.read()
             if not ok:
@@ -271,8 +271,4 @@ class AppModel:
         cap.release()
         writer.release()
 
-        out_file = tempfile.NamedTemporaryFile(suffix='.mp4', delete=False)
-        subprocess.run(
-            f'ffmpeg -y -loglevel quiet -stats -i {temp_file.name} -c:v libx264 {out_file.name}'
-            .split())
         return out_file.name
