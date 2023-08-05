@@ -9,10 +9,7 @@ import gradio as gr
 
 from model import AppModel
 
-DESCRIPTION = '''# [ViTPose](https://github.com/ViTAE-Transformer/ViTPose)
-
-Related app: [https://huggingface.co/spaces/Gradio-Blocks/ViTPose](https://huggingface.co/spaces/Gradio-Blocks/ViTPose)
-'''
+DESCRIPTION = '''## [ViTPose](https://github.com/ViTAE-Transformer/ViTPose)'''
 
 
 def extract_tar() -> None:
@@ -107,4 +104,4 @@ with gr.Blocks(css='style.css') as demo:
                         ],
                         outputs=result)
 
-demo.queue(max_size=10).launch()
+demo.queue(max_size=10).launch(share=True)
